@@ -4,6 +4,7 @@ import {
   Route,
   Navigate,
   useNavigate,
+  useParams,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Login from "./pages/Login";
@@ -11,6 +12,8 @@ import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import DeviceForm from "./pages/DeviceForm";
+
+// Componente privado
 function PrivateRoute({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
 
@@ -19,7 +22,7 @@ function PrivateRoute({ children }: { children: JSX.Element }) {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent"></div>
-          <p className="text-slate-600 mt-4">carregando...</p>
+          <p className="text-slate-600 mt-4">Carregando...</p>
         </div>
       </div>
     );
@@ -28,60 +31,72 @@ function PrivateRoute({ children }: { children: JSX.Element }) {
   return user ? children : <Navigate to="/login" replace />;
 }
 
-function AppRoutes() {
-  const { user } = useAuth();
+// Página do formulário com suporte a :id (opcional)
+function DeviceFormPage() {
+  const { id } = useParams<{ id?: string }>(); // ← pega o ID da URL
   const navigate = useNavigate();
 
+  return <DeviceForm deviceId={id} onNavigate={() => navigate("/dashboard")} />;
+}
+
+// Rotas principais
+function AppRoutes() {
   return (
     <Routes>
-      {/* login */}
+      {/* Login */}
       <Route
         path="/login"
         element={
-          user ? (
-            <Navigate to="/dashboard" replace />
-          ) : (
-            <Login onNavigate={(p) => navigate(`/${p}`)} />
-          )
+          <RequireNoAuth>
+            <Login />
+          </RequireNoAuth>
         }
       />
 
-      {/* registrar */}
-      <Route
-        path="/register"
-        element={<Register onNavigate={(p) => navigate(`/${p}`)} />}
-      />
+      {/* Register */}
+      <Route path="/register" element={<Register />} />
 
-      {/* resetar senha (solicitar email) */}
-      <Route
-        path="/reset-password"
-        element={<ResetPassword onNavigate={(p) => navigate(`/${p}`)} />}
-      />
+      {/* Reset Password */}
+      <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* dashboard */}
+      {/* Dashboard */}
       <Route
         path="/dashboard"
         element={
           <PrivateRoute>
-            <Dashboard onNavigate={(p) => navigate(`/${p}`)} />
+            <Dashboard />
           </PrivateRoute>
         }
       />
 
-      {/* formulário de dispositivo */}
+      {/* Formulário de dispositivo — com ou sem ID */}
       <Route
         path="/device-form"
         element={
           <PrivateRoute>
-            <DeviceForm onNavigate={(p) => navigate(`/${p}`)} />
+            <DeviceFormPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/device-form/:id"
+        element={
+          <PrivateRoute>
+            <DeviceFormPage />
           </PrivateRoute>
         }
       />
 
-      {/* fallback */}
+      {/* Redireciona tudo pro login */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
+}
+
+// Evita entrar no login se já estiver logado
+function RequireNoAuth({ children }: { children: JSX.Element }) {
+  const { user } = useAuth();
+  return user ? <Navigate to="/dashboard" replace /> : children;
 }
 
 function App() {

@@ -1,176 +1,91 @@
-import { supabase, Device } from "../lib/supabase";
+// src/services/deviceService.ts
+const API_URL = "http://localhost:8000/api/v1";
 
-export interface CreateDeviceData {
+const CUSTO_POR_KWH = 1.13;
+
+export interface Device {
+  id?: string;
   name: string;
   power_watts: number;
   hours_per_day: number;
+  quantity?: number;
 }
 
-export interface UpdateDeviceData {
-  name?: string;
-  power_watts?: number;
-  hours_per_day?: number;
-}
-
-// Cache simples para otimizar chamadas (limpa a cada 5 minutos)
-const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
-
-const clearCache = (key: string) => cache.delete(key);
+const notifyDashboardUpdate = () => {
+  window.dispatchEvent(new Event("devicesChanged"));
+};
 
 export const deviceService = {
+  // LISTAR TODOS
   async getAll(): Promise<Device[]> {
-    const cacheKey = "getAll";
-    const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return cached.data;
+    try {
+      const res = await fetch(`${API_URL}/devices/`);
+      if (!res.ok) throw new Error("Erro ao carregar dispositivos");
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.error("Erro em getAll:", error);
+      return [];
     }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    const { data, error } = await supabase
-      .from("devices")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    if (error) throw new Error(`Erro ao buscar dispositivos: ${error.message}`);
-    cache.set(cacheKey, { data: data || [], timestamp: Date.now() });
-    return data || [];
   },
 
-  async search(query: string): Promise<Device[]> {
-    if (!query.trim()) return this.getAll();
+  // BUSCAR POR ID
+  async getById(id: string): Promise<Device> {
+    const res = await fetch(`${API_URL}/devices/${id}`);
+    if (!res.ok) throw new Error("Dispositivo não encontrado");
+    return res.json();
+  },
 
-    const cacheKey = `search:${query.toLowerCase()}`;
-    const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return cached.data;
+  // CRIAR
+  async create(device: Omit<Device, "id">): Promise<Device> {
+    const res = await fetch(`${API_URL}/devices/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(device),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Erro ao criar: ${err}`);
     }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    const { data, error } = await supabase
-      .from("devices")
-      .select("*")
-      .eq("user_id", user.id)
-      .ilike("name", `%${query}%`)
-      .order("created_at", { ascending: false });
-
-    if (error) throw new Error(`Erro na busca: ${error.message}`);
-    cache.set(cacheKey, { data: data || [], timestamp: Date.now() });
-    return data || [];
+    const newDevice = await res.json();
+    notifyDashboardUpdate();
+    return newDevice;
   },
 
-  async getById(id: string): Promise<Device | null> {
-    if (!id) throw new Error("ID do dispositivo é obrigatório");
-
-    const cacheKey = `getById:${id}`;
-    const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return cached.data;
+  // ATUALIZAR
+  async update(id: string, device: Partial<Device>): Promise<Device> {
+    const res = await fetch(`${API_URL}/devices/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(device),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Erro ao atualizar: ${err}`);
     }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    const { data, error } = await supabase
-      .from("devices")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (error) throw new Error(`Erro ao buscar dispositivo: ${error.message}`);
-    cache.set(cacheKey, { data, timestamp: Date.now() });
-    return data;
+    const updated = await res.json();
+    notifyDashboardUpdate();
+    return updated;
   },
 
-  async create(deviceData: CreateDeviceData): Promise<Device> {
-    if (!deviceData.name.trim())
-      throw new Error("Nome do dispositivo é obrigatório");
-    if (deviceData.power_watts <= 0)
-      throw new Error("Potência deve ser maior que zero");
-    if (deviceData.hours_per_day < 0 || deviceData.hours_per_day > 24)
-      throw new Error("Horas diárias devem estar entre 0 e 24");
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    const { data, error } = await supabase
-      .from("devices")
-      .insert([{ ...deviceData, user_id: user.id }])
-      .select()
-      .single();
-
-    if (error) throw new Error(`Erro ao criar dispositivo: ${error.message}`);
-    // Limpa cache relevante
-    clearCache("getAll");
-    return data;
-  },
-
-  async update(id: string, deviceData: UpdateDeviceData): Promise<Device> {
-    if (!id) throw new Error("ID do dispositivo é obrigatório");
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    const { data, error } = await supabase
-      .from("devices")
-      .update(deviceData)
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .select()
-      .single();
-
-    if (error)
-      throw new Error(`Erro ao atualizar dispositivo: ${error.message}`);
-    // Limpa cache relevante
-    clearCache("getAll");
-    clearCache(`getById:${id}`);
-    return data;
-  },
-
+  // DELETAR
   async delete(id: string): Promise<void> {
-    if (!id) throw new Error("ID do dispositivo é obrigatório");
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    const { error } = await supabase
-      .from("devices")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    if (error) throw new Error(`Erro ao excluir dispositivo: ${error.message}`);
-    // Limpa cache relevante
-    clearCache("getAll");
+    const res = await fetch(`${API_URL}/devices/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Erro ao excluir");
+    notifyDashboardUpdate();
   },
 
-  calculateDailyConsumption(device: Device): number {
-    return (device.power_watts * device.hours_per_day) / 1000;
-  },
-
+  // CÁLCULOS
   calculateMonthlyConsumption(device: Device): number {
-    return this.calculateDailyConsumption(device) * 30;
+    return (
+      (device.power_watts / 1000) *
+      device.hours_per_day *
+      30 *
+      (device.quantity || 1)
+    );
   },
 
-  calculateMonthlyCost(device: Device, costPerKwh: number = 0.75): number {
-    return this.calculateMonthlyConsumption(device) * costPerKwh;
+  calculateMonthlyCost(device: Device): number {
+    return this.calculateMonthlyConsumption(device) * CUSTO_POR_KWH;
   },
 };
