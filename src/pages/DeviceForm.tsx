@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-import { deviceService } from "../services/deviceService";
-import { Device } from "../lib/supabase";
 import { Zap, ArrowLeft, Save } from "lucide-react";
 
 interface DeviceFormProps {
@@ -12,126 +10,103 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
   const [name, setName] = useState("");
   const [powerWatts, setPowerWatts] = useState("");
   const [hoursPerDay, setHoursPerDay] = useState("");
-  const [quantity, setQuantity] = useState("1"); // Novo campo
+  const [quantity, setQuantity] = useState("1");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [loadingDevice, setLoadingDevice] = useState(!!deviceId);
 
   const isEditing = !!deviceId;
+  const API_URL = "http://localhost:8000/api/v1";
 
+  // CARREGA DISPOSITIVO PARA EDIÇÃO
   useEffect(() => {
-    if (deviceId) {
-      loadDevice();
-    }
-  }, [deviceId]);
-
-  const loadDevice = async () => {
     if (!deviceId) return;
-
-    try {
-      const device: Device = await deviceService.getById(deviceId);
-      if (device) {
-        setName(device.name);
-        setPowerWatts(device.power_watts.toString());
-        setHoursPerDay(device.hours_per_day.toString());
-        setQuantity(device.quantity?.toString() || "1");
-      } else {
-        setError("Dispositivo não encontrado");
-      }
-    } catch (error: any) {
-      console.error("Erro ao carregar dispositivo:", error.message || error);
-      setError(
-        `Erro ao carregar dispositivo: ${error.message || "Desconhecido"}`
-      );
-    } finally {
-      setLoadingDevice(false);
-    }
-  };
+    setLoadingDevice(true);
+    fetch(`${API_URL}/devices/${deviceId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Dispositivo não encontrado");
+        return res.json();
+      })
+      .then((data) => {
+        setName(data.name);
+        setPowerWatts(data.power_watts.toString());
+        setHoursPerDay(data.hours_per_day.toString());
+        setQuantity(data.quantity?.toString() || "1");
+      })
+      .catch(() => setError("Erro ao carregar"))
+      .finally(() => setLoadingDevice(false));
+  }, [deviceId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-
-    if (!name.trim()) {
-      setError("O nome do dispositivo é obrigatório");
-      return;
-    }
+    setLoading(true);
 
     const power = parseInt(powerWatts);
     const hours = parseFloat(hoursPerDay);
-    const qty = parseInt(quantity);
+    const qty = parseInt(quantity) || 1;
 
-    if (isNaN(power) || power <= 0) {
-      setError("A potência deve ser um número maior que zero");
-      return;
-    }
+    if (!name.trim()) return setError("Nome é obrigatório");
+    if (isNaN(power) || power <= 0) return setError("Potência inválida");
+    if (isNaN(hours) || hours < 0 || hours > 24)
+      return setError("Horas entre 0 e 24");
+    if (qty <= 0) return setError("Quantidade inválida");
 
-    if (isNaN(hours) || hours < 0 || hours > 24) {
-      setError("O uso diário deve ser um número entre 0 e 24 horas");
-      return;
-    }
-
-    if (isNaN(qty) || qty <= 0) {
-      setError("A quantidade deve ser um número maior que zero");
-      return;
-    }
-
-    setLoading(true);
+    const deviceData = {
+      name: name.trim(),
+      power_watts: power,
+      hours_per_day: hours,
+      quantity: qty,
+    };
 
     try {
-      const deviceData: Device = {
-        name: name.trim(),
-        power_watts: power,
-        hours_per_day: hours,
-        quantity: qty,
-      };
-      console.log("Enviando dados:", deviceData);
-
       if (isEditing && deviceId) {
-        await deviceService.update(deviceId, deviceData);
+        // EDITAR
+        const res = await fetch(`${API_URL}/devices/${deviceId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(deviceData),
+        });
+        if (!res.ok) throw new Error("Erro ao atualizar");
       } else {
-        await deviceService.create(deviceData);
+        // CRIAR
+        const res = await fetch(`${API_URL}/devices/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(deviceData),
+        });
+        if (!res.ok) throw new Error("Erro ao criar");
       }
+
+      // VOLTA E AVISA O DASHBOARD
       onNavigate("dashboard");
-    } catch (error: any) {
-      console.error("Erro ao salvar dispositivo:", error.message || error);
-      setError(
-        `Erro ao salvar dispositivo: ${error.message || "Tente novamente"}`
-      );
+      setTimeout(() => window.dispatchEvent(new Event("devicesChanged")), 100);
+    } catch (err: any) {
+      setError(err.message || "Erro ao salvar");
     } finally {
       setLoading(false);
     }
   };
 
-  const monthlyConsumption =
-    powerWatts &&
-    hoursPerDay &&
-    quantity &&
-    !isNaN(parseInt(powerWatts)) &&
-    !isNaN(parseFloat(hoursPerDay)) &&
-    !isNaN(parseInt(quantity))
+  const monthlyKwh =
+    powerWatts && hoursPerDay
       ? (
           (parseInt(powerWatts) *
             parseFloat(hoursPerDay) *
             30 *
-            parseInt(quantity)) /
+            (parseInt(quantity) || 1)) /
           1000
         ).toFixed(2)
       : "0.00";
 
   const monthlyCost =
-    powerWatts &&
-    hoursPerDay &&
-    quantity &&
-    !isNaN(parseInt(powerWatts)) &&
-    !isNaN(parseFloat(hoursPerDay)) &&
-    !isNaN(parseInt(quantity))
+    powerWatts && hoursPerDay
       ? (
           (parseInt(powerWatts) *
             parseFloat(hoursPerDay) *
             30 *
-            parseInt(quantity) *
-            0.75) /
+            (parseInt(quantity) || 1) *
+            1.13) /
           1000
         ).toFixed(2)
       : "0.00";
@@ -180,114 +155,82 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-semibold text-slate-700 mb-2"
-              >
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Nome do Dispositivo
               </label>
               <input
-                id="name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-                placeholder="Ex: Geladeira, TV da Sala, Ar Condicionado"
                 required
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                placeholder="Ex: Geladeira"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label
-                  htmlFor="power"
-                  className="block text-sm font-semibold text-slate-700 mb-2"
-                >
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Potência (Watts)
                 </label>
                 <input
-                  id="power"
                   type="number"
                   min="1"
                   value={powerWatts}
                   onChange={(e) => setPowerWatts(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-                  placeholder="Ex: 150"
                   required
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                  placeholder="150"
                 />
-                <p className="text-xs text-slate-500 mt-2">
-                  Consulte o manual ou etiqueta do produto
-                </p>
               </div>
-
               <div>
-                <label
-                  htmlFor="hours"
-                  className="block text-sm font-semibold text-slate-700 mb-2"
-                >
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Uso Diário (Horas)
                 </label>
                 <input
-                  id="hours"
                   type="number"
                   min="0"
                   max="24"
                   step="0.1"
                   value={hoursPerDay}
                   onChange={(e) => setHoursPerDay(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-                  placeholder="Ex: 8"
                   required
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                  placeholder="8"
                 />
-                <p className="text-xs text-slate-500 mt-2">
-                  Tempo médio de uso por dia
-                </p>
               </div>
             </div>
 
             <div>
-              {" "}
-              {/* Novo campo: Quantidade */}
-              <label
-                htmlFor="quantity"
-                className="block text-sm font-semibold text-slate-700 mb-2"
-              >
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
                 Quantidade
               </label>
               <input
-                id="quantity"
                 type="number"
                 min="1"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-                placeholder="Ex: 1"
                 required
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                placeholder="1"
               />
-              <p className="text-xs text-slate-500 mt-2">
-                Número de dispositivos
-              </p>
             </div>
 
             {powerWatts && hoursPerDay && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                  Estimativa de Consumo
+                  Estimativa Mensal
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <p className="text-sm text-slate-600 mb-1">
-                      Consumo Mensal
-                    </p>
-                    <p className="text-2xl font-bold text-emerald-700">
-                      {monthlyConsumption} kWh
+                    <p className="text-sm text-slate-600">Consumo</p>
+                    <p className="text-3xl font-bold text-emerald-700">
+                      {monthlyKwh} kWh
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-600 mb-1">
-                      Custo Estimado (R$ 0,75/kWh)
-                    </p>
-                    <p className="text-2xl font-bold text-emerald-700">
+                    <p className="text-sm text-slate-600">Custo</p>
+                    <p className="text-3xl font-bold text-emerald-700">
                       R$ {monthlyCost}
                     </p>
                   </div>
@@ -295,18 +238,18 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
               </div>
             )}
 
-            <div className="flex gap-4 pt-4">
+            <div className="flex gap-4 pt-6">
               <button
                 type="button"
                 onClick={() => onNavigate("dashboard")}
-                className="flex-1 px-6 py-3 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 transition"
+                className="flex-1 py-3 border border-slate-300 rounded-lg hover:bg-slate-50"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-lg font-semibold hover:bg-emerald-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50"
               >
                 <Save className="w-5 h-5" />
                 {loading

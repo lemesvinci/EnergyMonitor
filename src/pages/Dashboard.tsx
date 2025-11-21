@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { deviceService } from "../services/deviceService";
-import { Device } from "../lib/supabase";
+import { useNavigate } from "react-router-dom";
 import {
   Zap,
   Search,
@@ -21,6 +21,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onNavigate }: DashboardProps) {
+  const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [devices, setDevices] = useState<Device[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -41,6 +42,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadDevices();
+
+    const handleUpdate = () => loadDevices();
+    window.addEventListener("devicesChanged", handleUpdate);
+
+    return () => window.removeEventListener("devicesChanged", handleUpdate);
+  }, []);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -140,7 +150,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               </div>
 
               <div className="flex items-center gap-4">
-                <span className="text-sm text-slate-600 animate-pulse">
+                <span className="text-sm text-slate-600">
                   {user?.email}
                 </span>
                 <button
@@ -246,7 +256,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                 Buscar
               </button>
               <button
-                onClick={() => onNavigate("device-form")}
+                onClick={() => navigate("/device-form")}
                 className="flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-lg font-semibold hover:bg-emerald-600 transition-all duration-200 hover:scale-105"
               >
                 <Plus className="w-5 h-5" />
@@ -332,7 +342,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() =>
-                                onNavigate("device-form", device.id)
+                                navigate(`/device-form/${device.id}`)
                               }
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 hover:scale-110"
                               title="Editar"
