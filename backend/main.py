@@ -84,22 +84,7 @@ def create_device(device: DeviceCreate, db: Session=Depends(get_db)):
     db_device = DeviceDB(**device.dict())
     db.add(db_device)
     db.commit()
-    db.refresh(db_device)
-    return db_device
-
-
-# LISTAR TODOS
-@app.get("/api/v1/devices/", response_model=List[DeviceResponse])
-def list_devices(db: Session=Depends(get_db)):
-    return db.query(DeviceDB).all()
-
-
-# BUSCAR POR ID
-@app.get("/api/v1/devices/{id}", response_model=DeviceResponse)
-def get_device_by_id(id: int, db: Session=Depends(get_db)):
-    device = db.query(DeviceDB).filter(DeviceDB.id == id).first()
-    if not device:
-        raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
+    db.refresh(device)
     return device
 
 
