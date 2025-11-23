@@ -61,7 +61,6 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
 
     try {
       if (isEditing && deviceId) {
-        // EDITAR
         const res = await fetch(`${API_URL}/devices/${deviceId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -69,7 +68,6 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
         });
         if (!res.ok) throw new Error("Erro ao atualizar");
       } else {
-        // CRIAR
         const res = await fetch(`${API_URL}/devices/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -78,7 +76,6 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
         if (!res.ok) throw new Error("Erro ao criar");
       }
 
-      // VOLTA E AVISA O DASHBOARD
       onNavigate("dashboard");
       setTimeout(() => window.dispatchEvent(new Event("devicesChanged")), 100);
     } catch (err: any) {
@@ -113,31 +110,34 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
 
   if (loadingDevice) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent"></div>
-          <p className="text-slate-600 mt-4">Carregando dispositivo...</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent mb-4"></div>
+          <p className="text-emerald-700 text-xl font-medium">
+            Carregando dispositivo...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <nav className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
+      {/* Navbar com cor */}
+      <nav className="bg-gradient-to-r from-emerald-600 to-teal-700 shadow-xl">
+        <div className="max-w-7xl mx-auto px-6 py-5">
+          <div className="flex items-center gap-4">
             <button
               onClick={() => onNavigate("dashboard")}
-              className="p-2 hover:bg-slate-100 rounded-lg transition"
+              className="p-3 bg-white/20 hover:bg-white/30 rounded-xl transition-all hover:scale-110"
             >
-              <ArrowLeft className="w-5 h-5 text-slate-600" />
+              <ArrowLeft className="w-6 h-6 text-white" />
             </button>
-            <div className="flex items-center gap-3">
-              <div className="bg-emerald-500 p-2 rounded-lg">
-                <Zap className="w-6 h-6 text-white" />
+            <div className="flex items-center gap-4">
+              <div className="bg-white/30 p-3 rounded-xl backdrop-blur">
+                <Zap className="w-8 h-8 text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-slate-900">
+              <h1 className="text-3xl font-bold text-white drop-shadow-lg">
                 {isEditing ? "Editar Dispositivo" : "Novo Dispositivo"}
               </h1>
             </div>
@@ -145,17 +145,19 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
         </div>
       </nav>
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-xl shadow-md p-8">
+      <div className="max-w-4xl mx-auto px-6 py-12">
+        <div className="bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-10 border border-emerald-100">
+          {/* Mensagem de erro com cor */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-              {error}
+            <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-5 rounded-xl mb-8 shadow-md">
+              <p className="font-semibold">⚠️ {error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Nome */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label className="block text-lg font-semibold text-emerald-800 mb-3">
                 Nome do Dispositivo
               </label>
               <input
@@ -163,14 +165,15 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                placeholder="Ex: Geladeira"
+                className="w-full px-5 py-4 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-lg"
+                placeholder="Ex: Geladeira, Ar Condicionado"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Potência + Horas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block text-lg font-semibold text-emerald-800 mb-3">
                   Potência (Watts)
                 </label>
                 <input
@@ -179,12 +182,12 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
                   value={powerWatts}
                   onChange={(e) => setPowerWatts(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-5 py-4 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-lg"
                   placeholder="150"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block text-lg font-semibold text-emerald-800 mb-3">
                   Uso Diário (Horas)
                 </label>
                 <input
@@ -195,14 +198,15 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
                   value={hoursPerDay}
                   onChange={(e) => setHoursPerDay(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-5 py-4 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-lg"
                   placeholder="8"
                 />
               </div>
             </div>
 
+            {/* Quantidade */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label className="block text-lg font-semibold text-emerald-800 mb-3">
                 Quantidade
               </label>
               <input
@@ -211,26 +215,31 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 required
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-5 py-4 border-2 border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-lg"
                 placeholder="1"
               />
             </div>
 
+            {/* Estimativa com fundo verde */}
             {powerWatts && hoursPerDay && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-300 rounded-2xl p-8 shadow-inner">
+                <h3 className="text-2xl font-bold text-emerald-900 mb-6 text-center">
                   Estimativa Mensal
                 </h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-sm text-slate-600">Consumo</p>
-                    <p className="text-3xl font-bold text-emerald-700">
-                      {monthlyKwh} kWh
+                <div className="grid grid-cols-2 gap-8 text-center">
+                  <div className="bg-white/70 rounded-2xl p-6 shadow-md">
+                    <p className="text-emerald-700 text-lg font-medium">
+                      Consumo
+                    </p>
+                    <p className="text-4xl font-bold text-emerald-600 mt-2">
+                      {monthlyKwh} <span className="text-2xl">kWh</span>
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-600">Custo</p>
-                    <p className="text-3xl font-bold text-emerald-700">
+                  <div className="bg-white/70 rounded-2xl p-6 shadow-md">
+                    <p className="text-emerald-700 text-lg font-medium">
+                      Custo Estimado
+                    </p>
+                    <p className="text-4xl font-bold text-emerald-600 mt-2">
                       R$ {monthlyCost}
                     </p>
                   </div>
@@ -238,25 +247,26 @@ export default function DeviceForm({ deviceId, onNavigate }: DeviceFormProps) {
               </div>
             )}
 
-            <div className="flex gap-4 pt-6">
+            {/* Botões */}
+            <div className="flex gap-6 pt-8">
               <button
                 type="button"
                 onClick={() => onNavigate("dashboard")}
-                className="flex-1 py-3 border border-slate-300 rounded-lg hover:bg-slate-50"
+                className="flex-1 py-4 border-2 border-slate-300 text-slate-700 rounded-2xl font-bold hover:bg-slate-50 transition-all hover:scale-105"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-3 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-bold hover:from-emerald-600 hover:to-teal-700 transition-all hover:scale-105 shadow-lg disabled:opacity-70"
               >
-                <Save className="w-5 h-5" />
+                <Save className="w-6 h-6" />
                 {loading
                   ? "Salvando..."
                   : isEditing
-                  ? "Atualizar"
-                  : "Cadastrar"}
+                  ? "Atualizar Dispositivo"
+                  : "Cadastrar Dispositivo"}
               </button>
             </div>
           </form>
